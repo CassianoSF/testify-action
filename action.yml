@@ -1,0 +1,61 @@
+name: "Testify Upload"
+description: "Collect and upload test reports (Playwright, Vitest) to Testify dashboard"
+author: "CassianoSF"
+branding:
+  icon: "check-circle"
+  color: "green"
+
+inputs:
+  api-key:
+    description: "Testify API key (store in GitHub Secrets)"
+    required: true
+  endpoint:
+    description: "Testify server endpoint"
+    required: false
+    default: "https://testify.codes"
+  playwright-report:
+    description: "Path to Playwright JSON report (from `playwright test --reporter=json`)"
+    required: false
+    default: ""
+  vitest-report:
+    description: "Path to Vitest JSON report"
+    required: false
+    default: ""
+  coverage-report:
+    description: "Path to Istanbul coverage JSON (coverage-final.json)"
+    required: false
+    default: ""
+  report-json:
+    description: "Path to a pre-built report.json (skips collection)"
+    required: false
+    default: ""
+  assets-dir:
+    description: "Directory containing screenshots/videos to upload as assets"
+    required: false
+    default: ""
+  pr-number:
+    description: "Pull request number (auto-detected in GitHub Actions)"
+    required: false
+    default: ""
+  pr-title:
+    description: "Pull request title (auto-detected in GitHub Actions)"
+    required: false
+    default: ""
+  branch:
+    description: "Branch name (auto-detected in GitHub Actions)"
+    required: false
+    default: ""
+  commit-sha:
+    description: "Commit SHA (auto-detected in GitHub Actions)"
+    required: false
+    default: ""
+
+outputs:
+  report-id:
+    description: "The ID of the created report"
+  report-url:
+    description: "URL to view the report in Testify dashboard"
+
+runs:
+  using: "node20"
+  main: "dist/index.js"
