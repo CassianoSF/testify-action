@@ -31506,22 +31506,38 @@ async function initUploadWithAssets(config, assets) {
   }
   return result.data;
 }
-async function uploadToPresignedUrl(presignedUrl, filePath, contentType = "application/octet-stream") {
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+async function uploadToPresignedUrl(presignedUrl, filePath, contentType = "application/octet-stream", maxRetries = 3) {
   const fileBuffer = import_fs3.default.readFileSync(filePath);
   const fileName = filePath.split("/").pop() || "file";
-  console.log(`[testify] Uploading ${fileName} (${(fileBuffer.length / 1024).toFixed(1)} KB)`);
-  const response = await fetch(presignedUrl, {
-    method: "PUT",
-    headers: {
-      "Content-Type": contentType,
-      "Content-Length": fileBuffer.length.toString()
-    },
-    body: fileBuffer
-  });
-  if (!response.ok) {
-    throw new Error(`Upload failed for ${fileName}: ${response.status} ${await response.text()}`);
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[testify] Uploading ${fileName} (${(fileBuffer.length / 1024).toFixed(1)} KB)`);
+      const response = await fetch(presignedUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": contentType,
+          "Content-Length": fileBuffer.length.toString()
+        },
+        body: fileBuffer
+      });
+      if (!response.ok) {
+        throw new Error(`Upload failed for ${fileName}: ${response.status} ${await response.text()}`);
+      }
+      console.log(`[testify] Uploaded ${fileName}`);
+      return;
+    } catch (err) {
+      if (attempt < maxRetries) {
+        const delay = attempt * 1e3;
+        console.warn(`[testify] Retry ${attempt}/${maxRetries} for ${fileName} in ${delay}ms (${err instanceof Error ? err.message : err})`);
+        await sleep(delay);
+      } else {
+        throw err;
+      }
+    }
   }
-  console.log(`[testify] Uploaded ${fileName}`);
 }
 async function uploadReportJson(presignedUrl, report) {
   const body = JSON.stringify(report);

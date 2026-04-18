@@ -110,30 +110,48 @@ export async function initUploadWithAssets(
   return result.data as InitResponse;
 }
 
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function uploadToPresignedUrl(
   presignedUrl: string,
   filePath: string,
   contentType: string = "application/octet-stream",
+  maxRetries = 3,
 ): Promise<void> {
   const fileBuffer = fs.readFileSync(filePath);
   const fileName = filePath.split("/").pop() || "file";
 
-  console.log(`[testify] Uploading ${fileName} (${(fileBuffer.length / 1024).toFixed(1)} KB)`);
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[testify] Uploading ${fileName} (${(fileBuffer.length / 1024).toFixed(1)} KB)`);
 
-  const response = await fetch(presignedUrl, {
-    method: "PUT",
-    headers: {
-      "Content-Type": contentType,
-      "Content-Length": fileBuffer.length.toString(),
-    },
-    body: fileBuffer,
-  });
+      const response = await fetch(presignedUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": contentType,
+          "Content-Length": fileBuffer.length.toString(),
+        },
+        body: fileBuffer,
+      });
 
-  if (!response.ok) {
-    throw new Error(`Upload failed for ${fileName}: ${response.status} ${await response.text()}`);
+      if (!response.ok) {
+        throw new Error(`Upload failed for ${fileName}: ${response.status} ${await response.text()}`);
+      }
+
+      console.log(`[testify] Uploaded ${fileName}`);
+      return;
+    } catch (err) {
+      if (attempt < maxRetries) {
+        const delay = attempt * 1000;
+        console.warn(`[testify] Retry ${attempt}/${maxRetries} for ${fileName} in ${delay}ms (${err instanceof Error ? err.message : err})`);
+        await sleep(delay);
+      } else {
+        throw err;
+      }
+    }
   }
-
-  console.log(`[testify] Uploaded ${fileName}`);
 }
 
 export async function uploadReportJson(
