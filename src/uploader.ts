@@ -8,22 +8,40 @@ async function request(
     headers?: Record<string, string>;
     body?: string;
   },
+  maxRedirects = 5,
 ): Promise<{ ok: boolean; status: number; data: unknown }> {
-  const response = await fetch(url, {
-    method: options.method,
-    headers: options.headers,
-    body: options.body,
-  });
+  let currentUrl = url;
 
-  const text = await response.text();
-  let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = text;
+  for (let i = 0; i <= maxRedirects; i++) {
+    const response = await fetch(currentUrl, {
+      method: options.method,
+      headers: options.headers,
+      body: options.body,
+      redirect: "manual",
+    });
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location) {
+        throw new Error(`Redirect ${response.status} without Location header`);
+      }
+      currentUrl = new URL(location, currentUrl).toString();
+      console.log(`[testify] Redirect ${response.status} -> ${currentUrl}`);
+      continue;
+    }
+
+    const text = await response.text();
+    let data: unknown;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+
+    return { ok: response.ok, status: response.status, data };
   }
 
-  return { ok: response.ok, status: response.status, data };
+  throw new Error(`Too many redirects (>${maxRedirects})`);
 }
 
 export async function initUpload(config: UploadConfig): Promise<InitResponse> {

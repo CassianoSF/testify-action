@@ -31452,20 +31452,34 @@ async function discoverAssets(assetsDir) {
 
 // src/uploader.ts
 var import_fs3 = __toESM(require("fs"));
-async function request2(url, options) {
-  const response = await fetch(url, {
-    method: options.method,
-    headers: options.headers,
-    body: options.body
-  });
-  const text = await response.text();
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = text;
+async function request2(url, options, maxRedirects = 5) {
+  let currentUrl = url;
+  for (let i = 0; i <= maxRedirects; i++) {
+    const response = await fetch(currentUrl, {
+      method: options.method,
+      headers: options.headers,
+      body: options.body,
+      redirect: "manual"
+    });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location) {
+        throw new Error(`Redirect ${response.status} without Location header`);
+      }
+      currentUrl = new URL(location, currentUrl).toString();
+      console.log(`[testify] Redirect ${response.status} -> ${currentUrl}`);
+      continue;
+    }
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+    return { ok: response.ok, status: response.status, data };
   }
-  return { ok: response.ok, status: response.status, data };
+  throw new Error(`Too many redirects (>${maxRedirects})`);
 }
 async function initUploadWithAssets(config, assets) {
   const url = `${config.endpoint}/api/v1/reports/init`;
